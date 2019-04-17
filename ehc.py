@@ -24,7 +24,7 @@ class EHC:
             debug("Root is {}".format(self.root))
             debug("printing children")
             for child in self.root:
-                print("child tag {} child atrib {}".format(child.tag,child.attrib))
+                debug("child tag {} child atrib {}".format(child.tag,child.attrib))
 
             self.remarks = []
         else:
@@ -148,13 +148,14 @@ class EHC:
         debug(hat)
         debug("end hat")
 
-#        x = re.search("WHITELIST:.*TRUSTED",hat)
+
         x = None
 
         lines = hat.splitlines()
         i = 0
         while i < len(lines):
             line = lines[i]
+            ### Check WHITELIST, that not too many IPs are defined
             x = re.search("^WHITELIST:",line)
             if x:
                 debug("match WHITELIST")
@@ -176,33 +177,84 @@ class EHC:
                     self.add_remark_warning("Lots of IPs in WHITELIST {}".format(str(num_of_IPs_in_whitelist)))
                 else:
                     self.add_remark_ok("Reasonable number of IPs in  WHITELIST {}".format(str(num_of_IPs_in_whitelist)))
-            else:
-                x = re.search("^BLACKLIST:",line)
-                if x:
-                    debug("match BLACKLIST")
-                    debug(x.string)
+
+            #
+            #  Check that BLACKLIST SRBRS score has not been changed and that policy is BLOCKED!
+            #
+            x = re.search("^BLACKLIST:",line)
+            if x:
+                debug("match BLACKLIST")
+                debug(x.string)
+                i = i+1
+                line1 = lines[i]
+                debug("blacklist is " + line1)
+                line1 = line1.replace("sbrs[","")
+                line1 = line1.replace("]","")
+                (low,high) = line1.split(':')
+                low = low.strip()
+                high = high.strip()
+                debug(low)
+                debug(high)
+                blacklist_ok = True
+                if (float(low) > -10):
+                    self.add_remark_warning("Too lenient blacklist! Lower end is {}".format(low))
+                    blacklist_ok = False
+                if (float(high) > -3):
+                    self.add_remark_warning("Too lenient blacklist! Higher End  is {}".format(high))
+                    blacklist_ok = False                        
+                if (float(high) < -3):
+                    self.add_remark_warning("Too harsh blacklist! Higher End  is {}".format(high))
+                    blacklist_ok = False
+                i = i+1
+                line1 = lines[i]
+                y = re.search("\$BLOCKED",line1)
+                if not y:
+                    self.add_remark_warning("Blacklist is not Blocking!! {}".format(line1))
+                    blacklist_ok = False
+                if blacklist_ok:
+                    self.add_remark_ok("Blacklist is ok, low {} high {}, and blocking".format(low,high))
+            #
+            #  Check that SUSPECTLIST SRBRS score has not been changed and that policy is THROTTLED!
+            #  check that SBRS score none -> throttled...
+            x = re.search("^SUSPECTLIST:",line)
+            if x:
+                debug("match SUSPECTLIST")
+                debug(x.string)
+                i = i+1
+                line1 = lines[i]
+                debug("suspectlist is " + line1)
+                line1 = line1.replace("sbrs[","")
+                line1 = line1.replace("]","")
+                (low,high) = line1.split(':')
+                low = low.strip()
+                high = high.strip()
+                debug(low)
+                debug(high)
+                suspectlist_ok = True
+                if (float(low) != -3.0):
+                    self.add_remark_warning("Changed defaults for Suspect List! Lower end is {}".format(low))
+                    suspectlist_ok = False
+                if (float(high) != -1.0):
+                    self.add_remark_warning("Changed defaults for Suspect List! Higher End  is {}".format(high))
+                    suspectlist_ok = False                        
+                i = i+1
+                line1 = lines[i]
+                if "sbrs[none]" in line1:
+                    self.add_remark_ok("Suspectlist contains domains with no reputation sbrs[none] {}".format(line1))
                     i = i+1
                     line1 = lines[i]
-                    debug("blacklist is " + line1)
-                    line1 = line1.replace("sbrs[","")
-                    line1 = line1.replace("]","")
-                    (low,high) = line1.split(':')
-                    low = low.strip()
-                    high = high.strip()
-                    debug(low)
-                    debug(high)
-                    blacklist_ok = True
-                    if (float(low) > -10):
-                        self.add_remark_warning("Too lenient blacklist! Lower end is {}".format(low))
-                        blacklist_ok = False
-                    if (float(high) > -3):
-                        self.add_remark_warning("Too lenient blacklist! Higher End  is {}".format(high))
-                        blacklist_ok = False                        
-                    if (float(high) < -3):
-                        self.add_remark_warning("Too harsh blacklist! Higher End  is {}".format(high))
-                        blacklist_ok = False
-                    if blacklist_ok:
-                        self.add_remark_ok("Blacklist is ok, low {} high {}".format(low,high))
+                else:
+                    suspectlist_ok = False
+                    self.add_remark_warning("Suspectlist should contain domains with no reputation sbrs[none] {}".format(line1))
+                y = re.search("\$THROTTLED",line1)
+                if not y:
+                    self.add_remark_warning("Suspectlist should be throttled {}".format(line1))
+                    suspectlist_ok = False
+                if suspectlist_ok:
+                    self.add_remark_ok("Suspectlist is ok, low {} high {}, including none-reputation and throttling".format(low,high))
+            #                
+            
+                    
             i = i + 1
 
             
