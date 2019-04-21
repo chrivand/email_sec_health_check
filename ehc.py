@@ -9,18 +9,16 @@ import re
 
 
 def debug(message):
-    print(message)
+    if False:
+        print(message)
 
 # class for email health check 
 class EHC:
-    def __init__(self,filename,ourdomain=""):
+    def __init__(self,configstring,ourdomain=""):
         self.ourdomain = ourdomain
-        self.XML_File = open(filename,'r')
+        self.XML_File = configstring
         if self.XML_File:
-            debug("XML file {} successfully opened!\n".format(filename))             
-            self.tree = ET.parse(filename)
-            debug("tree is {}".format(self.tree))            
-            self.root = self.tree.getroot()
+            self.root = ET.fromstring(configstring)
             debug("Root is {}".format(self.root))
             debug("printing children")
             for child in self.root:
@@ -28,7 +26,7 @@ class EHC:
 
             self.remarks = []
         else:
-            debug("Could not open file {}".format(filename))
+            debug("bajs")
 
             
     def get_licenses(self):
@@ -90,12 +88,18 @@ class EHC:
         else:
             debug("did not find exactly one of tag {}, found {}".format(xml_tag,str(found_items)))
              
-    def add_remark_warning(self,txt):
-        remark = {"level":"warning","text":txt}
+    def add_remark_warning(self,txt,category):
+        remark = {"level":"warning","text":txt,"category":category}
         self.remarks.append(remark)
 
-    def add_remark_ok(self,txt):
-        remark = {"level":"ok","text":txt}
+    def add_remark_ok(self,txt,category):
+        remark = {"level":"ok","text":txt,"category":category}
+        self.remarks.append(remark)
+
+    def add_remark_debug(self,txt,category):
+        if True:
+            return
+        remark = {"level":"debug","text":txt,"category":category}
         self.remarks.append(remark)
 
     def print_remarks(self):
@@ -119,16 +123,16 @@ class EHC:
         ]
         for r in rules_enabled:
             if self.xml_get_text_in_tag(r["text"]) == r["value"]:
-                self.add_remark_ok(r["name"])
+                self.add_remark_ok(r["name"],"FEATURE ENABLED")
             else:
-                self.add_remark_warning(r["name"])
+                self.add_remark_warning(r["name"],"FEATURE ENABLED")
 
         for r in rules_values:
             config_value = int(self.xml_get_text_in_tag(r["text"]))
             if config_value >= int(r["minvalue"]) and config_value <= int(r["maxvalue"]):
-                self.add_remark_ok(r["name"])
+                self.add_remark_ok(r["name"],"FEATURE LIMIT")
             else:
-                self.add_remark_warning(r["name"] + " " + str(config_value))                
+                self.add_remark_warning(r["name"] + " " + str(config_value),"FEATURE LIMIT")                
                                                          
 
     def xml_get_hat_incoming(self):
@@ -139,8 +143,22 @@ class EHC:
              found_hat = item.text
              return found_hat
 
+    def get_result(self):
+        return self.remarks
+
     def print_result(self):
-        print(json.dumps(self.remarks,indent=4,sort_keys=True))
+        return json.dumps(self.remarks)
+    
+    def print_result2(self):
+        result = ""
+        for remark in self.remarks:
+            if remark["level"] == "ok":
+                result = result + "CHECK PASSED:"+ remark["text"] + "<br>"
+            else:
+                result = result + "ERROR:"+ remark["text"] + "<br>"
+                
+        return result
+    
         
     def check_hat(self):
         hat = self.xml_get_hat_incoming()
@@ -174,9 +192,9 @@ class EHC:
                         num_of_IPs_in_whitelist = num_of_IPs_in_whitelist + 1
                         debug("New IP found in whitelist {}".format(newip))
                 if num_of_IPs_in_whitelist > 10:
-                    self.add_remark_warning("Lots of IPs in WHITELIST {}".format(str(num_of_IPs_in_whitelist)))
+                    self.add_remark_warning("Lots of IPs in WHITELIST {}".format(str(num_of_IPs_in_whitelist)),"HAT")
                 else:
-                    self.add_remark_ok("Reasonable number of IPs in  WHITELIST {}".format(str(num_of_IPs_in_whitelist)))
+                    self.add_remark_ok("Reasonable number of IPs in  WHITELIST {}".format(str(num_of_IPs_in_whitelist)),"HAT")
 
             #
             #  Check that BLACKLIST SRBRS score has not been changed and that policy is BLOCKED!
@@ -197,22 +215,22 @@ class EHC:
                 debug(high)
                 blacklist_ok = True
                 if (float(low) > -10):
-                    self.add_remark_warning("Too lenient blacklist! Lower end is {}".format(low))
+                    self.add_remark_warning("Too lenient blacklist! Lower end is {}".format(low),"HAT")
                     blacklist_ok = False
                 if (float(high) > -3):
-                    self.add_remark_warning("Too lenient blacklist! Higher End  is {}".format(high))
+                    self.add_remark_warning("Too lenient blacklist! Higher End  is {}".format(high),"HAT")
                     blacklist_ok = False                        
                 if (float(high) < -3):
-                    self.add_remark_warning("Too harsh blacklist! Higher End  is {}".format(high))
+                    self.add_remark_warning("Too harsh blacklist! Higher End  is {}".format(high),"HAT")
                     blacklist_ok = False
                 i = i+1
                 line1 = lines[i]
                 y = re.search("\$BLOCKED",line1)
                 if not y:
-                    self.add_remark_warning("Blacklist is not Blocking!! {}".format(line1))
+                    self.add_remark_warning("Blacklist is not Blocking!! {}".format(line1),"HAT")
                     blacklist_ok = False
                 if blacklist_ok:
-                    self.add_remark_ok("Blacklist is ok, low {} high {}, and blocking".format(low,high))
+                    self.add_remark_ok("Blacklist is ok, low {} high {}, and blocking".format(low,high),"HAT")
             #
             #  Check that SUSPECTLIST SRBRS score has not been changed and that policy is THROTTLED!
             #  check that SBRS score none -> throttled...
@@ -232,39 +250,79 @@ class EHC:
                 debug(high)
                 suspectlist_ok = True
                 if (float(low) != -3.0):
-                    self.add_remark_warning("Changed defaults for Suspect List! Lower end is {}".format(low))
+                    self.add_remark_warning("Changed defaults for Suspect List! Lower end is {}".format(low),"HAT")
                     suspectlist_ok = False
                 if (float(high) != -1.0):
-                    self.add_remark_warning("Changed defaults for Suspect List! Higher End  is {}".format(high))
+                    self.add_remark_warning("Changed defaults for Suspect List! Higher End  is {}".format(high),"HAT")
                     suspectlist_ok = False                        
                 i = i+1
                 line1 = lines[i]
                 if "sbrs[none]" in line1:
-                    self.add_remark_ok("Suspectlist contains domains with no reputation sbrs[none] {}".format(line1))
+                    self.add_remark_ok("Suspectlist contains domains with no reputation sbrs[none] {}".format(line1),"HAT")
                     i = i+1
                     line1 = lines[i]
                 else:
                     suspectlist_ok = False
-                    self.add_remark_warning("Suspectlist should contain domains with no reputation sbrs[none] {}".format(line1))
+                    self.add_remark_warning("Suspectlist should contain domains with no reputation sbrs[none] {}".format(line1),"HAT")
                 y = re.search("\$THROTTLED",line1)
                 if not y:
-                    self.add_remark_warning("Suspectlist should be throttled {}".format(line1))
+                    self.add_remark_warning("Suspectlist should be throttled {}".format(line1),"HAT")
                     suspectlist_ok = False
                 if suspectlist_ok:
-                    self.add_remark_ok("Suspectlist is ok, low {} high {}, including none-reputation and throttling".format(low,high))
-            #                
-            
+                    self.add_remark_ok("Suspectlist is ok, low {} high {}, including none-reputation and throttling".format(low,high),"HAT")
+            #
+            x = re.search("^\$ACCEPTED",line)
+            if x:
+                self.add_remark_debug("found accepted","Debug")                
+                grabbed_accept_policy = False
+                grabbing = False
+                spf_enabled = False
+                dkim_enabled = False
+                dmarc_enabled = False                
+                while grabbed_accept_policy == False:
+                    i = i + 1
+                    line1 = lines[i]
+                    y = re.search("ACCEPT {}",line1)
+                    if y:
+                        self.add_remark_debug("Accept one line","Debug")                                            
+                        break
+                    y = re.search("ACCEPT {",line1)
+                    if y:
+                        grabbing = True
+                        self.add_remark_debug("Grabbing","Debug")                                                                    
+                    else:
+                        y = re.search("}",line1)
+                        if y and grabbing:
+                            self.add_remark_debug("Grabbed","Debug")
+                            break
+                    self.add_remark_debug("Grabbing",line1)                                                                                            
+                    y = re.search("dkim_verification_profile",line1)
+                    if y:
+                        dkim_enabled = True
+                    y = re.search("dmarc_verification_profile",line1)
+                    if y:
+                        dmarc_enabled = True
+                    y = re.search("spf_profile",line1)
+                    if y:
+                        spf_enabled = True
+
+                if dkim_enabled:
+                    self.add_remark_ok("Check DKIM Enabled","HAT Mail Flow Policy")
+                else:
+                    self.add_remark_warning("Check DKIM Enabled","HAT Mail Flow Policy")                    
+                if dmarc_enabled:
+                    self.add_remark_ok("Check DMARC Enabled","HAT Mail Flow Policy")
+                else:
+                    self.add_remark_warning("Check DMARC Enabled","HAT Mail Flow Policy")                    
+                if spf_enabled:
+                    self.add_remark_ok("Check SPF Enabled","HAT Mail Flow Policy")
+                else:
+                    self.add_remark_warning("Check SPF Enabled","HAT Mail Flow Policy")                    
+
+
+                
                     
             i = i + 1
 
             
-if __name__ == "__main__":
-
-    filename = sys.argv[1]
-    debug("Filename is {}".format(filename))
-    ehc = EHC(filename)
-    ehc.get_licenses()
-    ehc.check_rules()
-    ehc.check_hat()
-    ehc.print_result()
     
