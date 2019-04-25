@@ -1,6 +1,6 @@
 # Cisco Email Health Checker (EHC)
 
-This is sample code for our prototype of the EHC. Created by Hakan Nohre and Christopher van der Made.
+This is sample code for our prototype of the EHC. Created by Håkan Nohre and Christopher van der Made.
 
 Ehc.py contains the brains of the process.
 
