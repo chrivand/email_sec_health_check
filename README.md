@@ -2,7 +2,7 @@
 
 This is sample code for our prototype of the EHC. Created by Hakan Nohre and Christopher van der Made.
 
-Current latest file: email_health_check_new.py (we will clean everything up a.s.a.p.)
+Ehc.py contains the brains of the process.
 
 ## Solution components
 
