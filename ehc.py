@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import sys
 import json
 import re
+import checkdmarc
 
 
 def debug(message):
@@ -15,6 +16,7 @@ def debug(message):
 # class for email health check 
 class EHC:
     def __init__(self,configstring,ourdomain=""):
+        self.remarks = []        
         self.ourdomain = ourdomain
         self.XML_File = configstring
         if self.XML_File:
@@ -24,10 +26,51 @@ class EHC:
             for child in self.root:
                 debug("child tag {} child atrib {}".format(child.tag,child.attrib))
 
-            self.remarks = []
+
         else:
             debug("bajs")
 
+
+    def dmarc_check(self,domainname,approved_nameservers,approved_mx_hostnames):
+        domainlist = []
+        domainlist.append(domainname)
+        rsp = checkdmarc.check_domains(domainlist,approved_nameservers=approved_nameservers,approved_mx_hostnames=approved_mx_hostnames) 
+        
+        ns = rsp["ns"]
+        if ns["warnings"]:
+            ns_warnings = ns["warnings"]
+            for warning in ns_warnings:
+                self.add_remark_warning(warning,"DNS CHECKS")
+                
+
+        mx = rsp["mx"]
+        hosts = mx["hosts"]
+        for host in hosts:
+            if host["tls"] == False:
+                tls_compliance = [
+                    { 'host_name':host["hostname"], 'tls_status':'non_compliant', 'error':None }
+                ]
+                self.add_remark_warning("TLS is not compliant","TLS COMPLIANCE")
+                
+        
+        if mx["warnings"]:
+            mx_warnings = mx["warnings"]
+            for warning in mx_warnings:
+                self.add_remark_warning(warning,"DNS CHECK")
+                
+
+        dmarc = rsp["dmarc"]
+        if "error" in dmarc:
+            error = dmarc["error"]
+            dmarc_compliance = [
+                { 'domain':domainname, 'dmarc_status':'non_compliant', 'error':error }
+            ]
+            self.add_remark_warning("Dmarc is not compliant:"+dmarc["error"],"DNS CHECKS")
+        else:
+            dmarc_compliance = [
+                { 'domain':domainname, 'dmarc_status':'compliant', 'error':None }
+            ]
+            self.add_remark_ok("DMARC DNS record has been published (Compliant)","DNS CHECKS")
             
     def get_licenses(self):
         self.licenses_dict = {

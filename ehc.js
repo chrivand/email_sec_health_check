@@ -5,8 +5,10 @@ function getStarted() {
     gl_xhr = new XMLHttpRequest();
 
     gl_email_config = [
-	{ "id" :"domain_name","value":"", "label": "DOMAIN NAME" },
-	{ "id" :"internal_mail_servers","value":"", "label": "INTERNAL MAIL SERVERS" },	
+	{ "id" :"domain_name","value":"", "label": "DOMAIN NAME","csa":false },
+	{ "id" :"internal_mail_servers","value":"", "label": "INTERNAL MAIL SERVERS","csa":true },
+	{ "id" :"approved_mx_hostnames","value":"", "label": "APPROVED MX HOSTNAMES","csa":true },
+	{ "id" :"approved_nameservers","value":"", "label": "APPROVED NAME SERVERS","csa":true },			
     ];
     
     mAbout();    
@@ -53,21 +55,6 @@ function cbTimeGlass() {
     timeGlass();
 }
 
-function hostTimer() {
-    gl_host_timer = window.setTimeout(cbHostTimer,20000);
-}
-function cbHostTimer() {
-    mRefreshHosts(true);
-    hostTimer();
-}
-
-function userTimer() {
-    gl_user_timer = window.setTimeout(cbUserTimer,20000);
-}
-function cbUserTimer() {
-    mRefreshUsers(true);
-    userTimer();
-}
 
 
 function stopTimeGlass() {
@@ -169,7 +156,6 @@ function displayText(t) {
 }
 function updateRetCode(result,result2) {
 
-    return
     if (result == "OK") {
 	rsptext = result2;
 	cssClass = "divOK";
@@ -495,12 +481,13 @@ function mUploadFile() {
     divRow = addCellRow(divChild);
     addCellButton(divRow,"Submit","Submit","submit",cbSubmitFile);
     addCellButton(divRow,"Cancel","Cancel","submit",mAbout);
-    updateRetCode("OK","Updated Email Configuration")
+    updateRetCode("OK","")
     
 }
 
 
 function submitFileResponse(xhr) {
+    stopTimeGlass();
     var rsp = JSON.parse(xhr.responseText);
     if (rsp.result != "OK") {
 	alert("Error submitting File" + rsp.result);
@@ -535,7 +522,7 @@ function submitFileResponse(xhr) {
 	addCell(divRow,check["text"]);
 	divTable.appendChild(divRow);
     }
-    
+    updateRetCode("OK","")
 
 }
 
@@ -547,9 +534,10 @@ function cbSubmitFile() {
     formData.append('file', file);    
 
     
-    sendXfile(gl_xhr,"/cgi-bin/ehc_esaconfig.py",formData,submitFileResponse);
+    sendXfile(gl_xhr,"/cgi-bin/ehctestme.py",formData,submitFileResponse);
     gl_retcode = "Analysing ESA config file, please wait!"    
     updateRetCode("Wait",gl_retcode)
+    timeGlass()
 }
 
 
